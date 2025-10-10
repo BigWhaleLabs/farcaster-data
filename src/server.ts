@@ -33,7 +33,7 @@ BigInt.prototype.toJSON = function () {
 
 import env from 'helpers/env'
 import yoga from 'helpers/yoga'
-import { runManualSync, startDailyUserSync } from 'jobs/dailyUserSync'
+import { startDailyUserSync } from 'jobs/dailyUserSync'
 
 const server = Bun.serve({
   fetch: yoga.fetch,
@@ -43,7 +43,6 @@ const server = Bun.serve({
 console.log(`🚀 Farcaster Data server running at http://localhost:${env.PORT}/`)
 
 // Start the daily user sync job
-await runManualSync()
 startDailyUserSync()
 console.log('📅 Daily user sync job started')
 
