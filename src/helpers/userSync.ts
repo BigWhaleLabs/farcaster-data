@@ -4,13 +4,28 @@ import prismaClient from 'helpers/prismaClient'
 
 export async function getAllFidsFromHub(): Promise<number[]> {
   try {
+    const fids = []
+    let cursor: Uint8Array | undefined = undefined
     // Get FIDs from the hub - shardId 0 contains all FIDs
-    const result = await hubClient.getFids({ shardId: 0 })
-    if (result.isErr()) {
-      throw new Error(`Hub error: ${result.error.message}`)
+    console.log('Fetching all FIDs from Farcaster hub...')
+    for (const shardId of [1, 2]) {
+      do {
+        const result = await hubClient.getFids({
+          pageToken: cursor,
+          shardId,
+        })
+        console.log(
+          `Fetched ${result.isOk() ? result.value.fids.length : 0} FIDs from hub, total so far: ${fids.length}`
+        )
+        if (result.isErr()) {
+          throw new Error(`Hub error: ${result.error.message}`)
+        }
+        fids.push(...result.value.fids)
+        cursor = result.value.nextPageToken
+      } while (!!cursor)
     }
 
-    return result.value.fids
+    return fids
   } catch (error) {
     console.error('Error fetching FIDs from hub:', error)
     throw error
