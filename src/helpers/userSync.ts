@@ -73,9 +73,11 @@ export function neynarUserToPrismaUser(neynarUser: NeynarUser) {
 export async function syncUsersFromNeynar(fids: number[]) {
   console.log(`Starting sync of ${fids.length} users from Neynar...`)
 
-  // Process in chunks of 100 (Neynar's limit) with 100 parallel requests
+  // Process in chunks of 100 (Neynar's limit) with rate limiting
+  // Target: 80% of 600 RPM = 480 RPM = 8 RPS
   const chunkSize = 100
-  const parallelBatches = 5
+  const parallelBatches = 8 // 8 parallel requests per batch = 8 RPS
+  const batchDelayMs = 1000 // 1 second delay to maintain 8 RPS
   let processed = 0
   let successful = 0
   let errors = 0
@@ -177,9 +179,9 @@ export async function syncUsersFromNeynar(fids: number[]) {
       `Batch completed: ${processed}/${fids.length} FIDs processed (${successful} successful, ${errors} errors)`
     )
 
-    // Add small delay between batches to be respectful to APIs
+    // Rate limiting: delay between batches to maintain 8 RPS (80% of 10 RPS limit)
     if (batchEnd < chunks.length) {
-      await new Promise((resolve) => setTimeout(resolve, 200))
+      await new Promise((resolve) => setTimeout(resolve, batchDelayMs))
     }
   }
 
