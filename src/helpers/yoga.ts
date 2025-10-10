@@ -1,5 +1,3 @@
-import 'reflect-metadata'
-
 import { createYoga, type YogaInitialContext } from 'graphql-yoga'
 import prismaClient from 'helpers/prismaClient.js'
 import schema from 'helpers/schema'

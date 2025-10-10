@@ -1,4 +1,6 @@
+import 'core-js'
 import 'reflect-metadata'
+
 import 'dotenv/config'
 
 // Add global error handlers to prevent server crashes
