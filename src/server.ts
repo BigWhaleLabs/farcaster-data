@@ -36,6 +36,8 @@ import yoga from 'helpers/yoga'
 import { startDailyUserSync } from 'jobs/dailyUserSync'
 import startFarcasterFeedListener from 'jobs/farcasterFeedListener'
 
+import backfillCasts from 'jobs/backfillCasts'
+
 const server = Bun.serve({
   fetch: yoga.fetch,
   port: env.PORT,
@@ -50,5 +52,14 @@ console.log('📅 Daily user sync job started')
 // Start the Farcaster feed listener to save all casts
 startFarcasterFeedListener()
 console.log('🎧 Farcaster feed listener started')
+
+// Start the backfill job in parallel (non-blocking)
+backfillCasts()
+  .then(() => {
+    console.log('🗄️ Backfill job completed')
+  })
+  .catch((err) => {
+    console.error('🗄️ Backfill job error:', err)
+  })
 
 export { server }
