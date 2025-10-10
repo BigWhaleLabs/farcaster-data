@@ -73,52 +73,113 @@ export function neynarUserToPrismaUser(neynarUser: NeynarUser) {
 export async function syncUsersFromNeynar(fids: number[]) {
   console.log(`Starting sync of ${fids.length} users from Neynar...`)
 
-  // Process in chunks of 100 (Neynar's limit)
+  // Process in chunks of 100 (Neynar's limit) with 100 parallel requests
   const chunkSize = 100
+  const parallelBatches = 100
   let processed = 0
   let successful = 0
   let errors = 0
 
+  // Split FIDs into chunks of 100
+  const chunks = []
   for (let i = 0; i < fids.length; i += chunkSize) {
-    const chunk = fids.slice(i, i + chunkSize)
+    chunks.push(fids.slice(i, i + chunkSize))
+  }
 
-    try {
-      const neynarUsers = await getNeynarUsers(chunk)
+  console.log(
+    `Processing ${chunks.length} chunks with ${parallelBatches} parallel requests`
+  )
 
-      // Upsert users to database
-      for (const neynarUser of neynarUsers) {
-        try {
-          const userData = neynarUserToPrismaUser(neynarUser)
+  // Process chunks in batches of 100 parallel requests
+  for (
+    let batchStart = 0;
+    batchStart < chunks.length;
+    batchStart += parallelBatches
+  ) {
+    const batchEnd = Math.min(batchStart + parallelBatches, chunks.length)
+    const currentBatch = chunks.slice(batchStart, batchEnd)
 
-          await prismaClient.user.upsert({
-            where: { fid: neynarUser.fid },
-            update: {
-              ...userData,
-              updatedAt: new Date(),
-            },
-            create: userData,
+    console.log(
+      `Processing batch ${Math.floor(batchStart / parallelBatches) + 1}/${Math.ceil(chunks.length / parallelBatches)} (${currentBatch.length} parallel requests)`
+    )
+
+    // Process all chunks in this batch in parallel
+    const batchPromises = currentBatch.map(async (chunk, index) => {
+      const chunkIndex = batchStart + index
+      try {
+        const neynarUsers = await getNeynarUsers(chunk)
+
+        // Process users in this chunk
+        const chunkResults = await Promise.allSettled(
+          neynarUsers.map(async (neynarUser) => {
+            const userData = neynarUserToPrismaUser(neynarUser)
+
+            return prismaClient.user.upsert({
+              where: { fid: neynarUser.fid },
+              update: {
+                ...userData,
+                updatedAt: new Date(),
+              },
+              create: userData,
+            })
           })
+        )
 
-          successful++
-        } catch (error) {
-          console.error(`Error upserting user ${neynarUser.fid}:`, error)
-          errors++
+        // Count results for this chunk
+        let chunkSuccessful = 0
+        let chunkErrors = 0
+
+        chunkResults.forEach((result, userIndex) => {
+          if (result.status === 'fulfilled') {
+            chunkSuccessful++
+          } else {
+            chunkErrors++
+            console.error(
+              `Error upserting user ${neynarUsers[userIndex]?.fid}:`,
+              result.reason
+            )
+          }
+        })
+
+        return {
+          processed: chunk.length,
+          successful: chunkSuccessful,
+          errors: chunkErrors,
+          chunkIndex,
+        }
+      } catch (error) {
+        console.error(`Error processing chunk ${chunkIndex}:`, error)
+        return {
+          processed: chunk.length,
+          successful: 0,
+          errors: chunk.length,
+          chunkIndex,
         }
       }
+    })
 
-      processed += chunk.length
-      console.log(
-        `Processed ${processed}/${fids.length} FIDs (${successful} successful, ${errors} errors)`
-      )
+    // Wait for all chunks in this batch to complete
+    const batchResults = await Promise.allSettled(batchPromises)
 
-      // Add small delay between API calls to be respectful
-      if (i + chunkSize < fids.length) {
-        await new Promise((resolve) => setTimeout(resolve, 100))
+    // Aggregate results from this batch
+    batchResults.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        processed += result.value.processed
+        successful += result.value.successful
+        errors += result.value.errors
+      } else {
+        console.error('Batch promise failed:', result.reason)
+        errors += chunkSize // Assume full chunk failed
       }
-    } catch (error) {
-      console.error(`Error processing chunk starting at index ${i}:`, error)
-      errors += chunk.length
-      processed += chunk.length
+    })
+
+    console.log(
+      `Batch completed: ${processed}/${fids.length} FIDs processed (${successful} successful, ${errors} errors)`
+    )
+
+    // Add small delay between batches to be respectful to APIs
+    if (batchEnd < chunks.length) {
+      await new Promise((resolve) => setTimeout(resolve, 200))
     }
   }
 
