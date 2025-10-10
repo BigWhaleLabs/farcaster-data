@@ -1,3 +1,5 @@
+import 'reflect-metadata'
+
 import { UserDataType } from '@farcaster/hub-nodejs'
 import { User } from '@generated/type-graphql'
 import hubClient from 'helpers/hubClient'

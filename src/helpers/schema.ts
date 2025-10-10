@@ -1,3 +1,5 @@
+import 'reflect-metadata'
+
 import UserResolver from 'resolvers/UserResolver.js'
 import { buildSchema } from 'type-graphql'
 
