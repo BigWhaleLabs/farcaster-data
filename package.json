@@ -1,0 +1,43 @@
+{
+  "name": "farcaster-data",
+  "version": "1.0.0",
+  "description": "Farcaster user data synchronization service with GraphQL API",
+  "module": "src/server.ts",
+  "author": "borodutch",
+  "license": "MIT",
+  "scripts": {
+    "start": "bun src/server.ts",
+    "dev": "bun --watch src/server.ts",
+    "build-ts": "tsc --skipLibCheck --noEmit",
+    "lint": "bun --bun eslint",
+    "cli": "bun src/cli.ts",
+    "apply-migrations": "bun prisma migrate deploy",
+    "apply-migrations-if-needed": "bun prisma migrate status || bun apply-migrations"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/eslint-config-prettier": "^6.11.3",
+    "@types/node-cron": "^3.0.11",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "typescript-eslint": "^8.44.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@farcaster/hub-nodejs": "^0.15.6",
+    "@prisma/client": "^5.22.0",
+    "dotenv": "^16.6.1",
+    "envalid": "^8.1.0",
+    "graphql": "^16.11.0",
+    "graphql-scalars": "^1.24.2",
+    "graphql-yoga": "^5.15.2",
+    "node-cron": "^4.2.1",
+    "prisma": "^5.22.0",
+    "reflect-metadata": "^0.2.2",
+    "type-graphql": "^2.0.0-rc.2",
+    "typegraphql-prisma": "^0.28.0"
+  }
+}

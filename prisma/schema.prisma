@@ -1,0 +1,69 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "relationJoins"]
+}
+
+generator typegraphql {
+  provider        = "typegraphql-prisma"
+  emitOnly        = ["enums", "models", "relationResolvers"]
+  simpleResolvers = true
+  useSimpleInputs = true
+  emitIdAsIDType  = true
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES")
+}
+
+model User {
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Primary identifier from Farcaster
+  fid Int @id @unique
+
+  // Basic user data
+  username     String?
+  displayName  String?
+  custodyAddress String?
+  pfpUrl       String?
+  
+  // Profile data
+  bioText      String?
+  locationCity String?
+  locationState String?
+  locationStateCode String?
+  locationCountry String?
+  locationCountryCode String?
+  bannerUrl    String?
+  
+  // Counts and metrics
+  followerCount  Int?
+  followingCount Int?
+  score         Float?
+  neynarUserScore Float?
+  powerBadge    Boolean @default(false)
+  
+  // Verification data  
+  verifications String[] // Array of verified addresses
+  ethAddresses  String[] // Verified Ethereum addresses
+  solAddresses  String[] // Verified Solana addresses
+  primaryEthAddress String?
+  primarySolAddress String?
+  
+  // Verified accounts on other platforms
+  verifiedAccounts Json? // Store as JSON for flexibility
+  
+  // Pro status
+  proStatus     String? // "active", "inactive", etc.
+  proSubscribedAt DateTime?
+  proExpiresAt   DateTime?
+  
+  // Hub and sync metadata
+  lastSynced   DateTime @default(now())
+  syncSource   String @default("neynar") // "neynar", "hub", "manual"
+  isActive     Boolean @default(true)
+  
+  @@map("users")
+}
