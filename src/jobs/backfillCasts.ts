@@ -7,7 +7,7 @@ import minNeynarScore from 'helpers/minNeynar'
 import prismaClient from 'helpers/prismaClient'
 
 // Configuration constants
-const USERS_BATCH_SIZE = 100
+const USERS_BATCH_SIZE = 500
 const CASTS_BATCH_SIZE = 100
 const DELAY_BETWEEN_BATCHES = 1000 // 1 second delay between user batches
 const DELAY_BETWEEN_CAST_REQUESTS = 100 // 100ms delay between cast requests
@@ -80,7 +80,7 @@ export default async function backfillCasts() {
 
       // Process users in parallel with rate limiting
       const userPromises = users.map((user, index) =>
-        processUserCasts(user, index)
+        processUserCasts(user, index, totalUsers, processedUsers + index + 1)
       )
 
       const results = await Promise.allSettled(userPromises)
@@ -120,9 +120,6 @@ export default async function backfillCasts() {
         console.log(
           `[BACKFILL_CASTS] ⏸️ Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch`
         )
-        await new Promise((resolve) =>
-          setTimeout(resolve, DELAY_BETWEEN_BATCHES)
-        )
       }
     }
 
@@ -150,7 +147,9 @@ async function processUserCasts(
     score: number | null
     neynarUserScore: number | null
   },
-  batchIndex: number
+  batchIndex: number,
+  totalUsers: number,
+  currentUserIndex: number
 ): Promise<number> {
   const { fid, username } = user
   let castsProcessed = 0
@@ -161,13 +160,6 @@ async function processUserCasts(
   )
 
   try {
-    // Add staggered delay based on batch index to spread out requests
-    if (batchIndex > 0) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, batchIndex * DELAY_BETWEEN_CAST_REQUESTS)
-      )
-    }
-
     let hasMoreCasts = true
     let pageCount = 0
 
@@ -191,8 +183,11 @@ async function processUserCasts(
 
         const { messages, nextPageToken } = castsResult.value
 
+        const progressPercent = Math.round(
+          (currentUserIndex / totalUsers) * 100
+        )
         console.log(
-          `[BACKFILL_CASTS] 📄 Page ${pageCount} for ${username || `FID ${fid}`}: ${messages.length} casts`
+          `[BACKFILL_CASTS] 📄 Page ${pageCount} for ${username || `FID ${fid}`}: ${messages.length} casts (User ${currentUserIndex}/${totalUsers} - ${progressPercent}%)`
         )
 
         if (messages.length === 0) {
@@ -220,17 +215,7 @@ async function processUserCasts(
         // Check if there are more pages
         if (nextPageToken && nextPageToken.length > 0) {
           pageToken = nextPageToken
-          // Add small delay between pages for the same user
-          await new Promise((resolve) => setTimeout(resolve, 50))
         } else {
-          hasMoreCasts = false
-        }
-
-        // Stop if we've processed too many pages for one user (safety mechanism)
-        if (pageCount > 100) {
-          console.warn(
-            `[BACKFILL_CASTS] ⚠️ Stopping after 100 pages for FID ${fid} to prevent infinite loops`
-          )
           hasMoreCasts = false
         }
       } catch (error) {
@@ -333,5 +318,5 @@ export async function backfillCastsForUser(fid: number): Promise<number> {
     throw new Error(`User with FID ${fid} not found`)
   }
 
-  return processUserCasts(user, 0)
+  return processUserCasts(user, 0, 1, 1)
 }
