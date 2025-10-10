@@ -293,7 +293,9 @@ async function saveCastToDatabase(message: Message) {
         parentCastHash: castAddBody.parentCastId?.hash
           ? uint8ArrayToHex(castAddBody.parentCastId.hash)
           : null,
-        embeds: castAddBody.embeds || null,
+        embeds: castAddBody.embeds
+          ? JSON.parse(JSON.stringify(castAddBody.embeds))
+          : null,
         processedBy: 'farcaster-feed-listener',
         isReply,
         isQuoteCast,
