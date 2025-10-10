@@ -6,11 +6,10 @@ A Bun-based TypeScript service that synchronizes Farcaster user data and provide
 
 - 📅 **Daily Sync**: Automatically fetches all user FIDs from Farcaster Hub and updates user data from Neynar
 - 🔍 **Smart Fetching**: GraphQL queries with fallback to hub+Neynar if user not found in database
-- 🚀 **High Performance**: Built with Bun for fast startup and execution
-- 📊 **Rich Data**: Stores comprehensive user profiles including social accounts, verifications, and metrics
-- 🎯 **Type Safe**: Full TypeScript support with Prisma and TypeGraphQL
-
-## Stack
+- 🎧 **Real-time Cast Storage**: Listens to Farcaster Hub and saves all casts to database in real-time
+- 🚀 **High Performance**: Built with Bun for fast startup and execution with parallel processing
+- 📊 **Rich Data**: Stores comprehensive user profiles and cast data including replies, mentions, and quotes
+- 🎯 **Type Safe**: Full TypeScript support with Prisma and TypeGraphQL## Stack
 
 - **Runtime**: Bun
 - **Language**: TypeScript
@@ -130,6 +129,99 @@ query GetPowerBadgeUsers($limit: Float) {
 }
 ```
 
+## Cast Queries
+
+### Get Cast by Hash
+
+```graphql
+query GetCast($hash: String!) {
+  getCastByHash(hash: $hash) {
+    hash
+    fid
+    parentHash
+    parentFid
+    text
+    mentions
+    embeds
+    timestamp
+    user {
+      fid
+      username
+      displayName
+      pfpUrl
+    }
+  }
+}
+```
+
+### Get Recent Casts
+
+```graphql
+query GetRecentCasts($limit: Float) {
+  getRecentCasts(limit: $limit) {
+    hash
+    fid
+    text
+    timestamp
+    user {
+      username
+      displayName
+      pfpUrl
+    }
+  }
+}
+```
+
+### Get Casts by User
+
+```graphql
+query GetCastsByUser($fid: Float!, $limit: Float) {
+  getCastsByFid(fid: $fid, limit: $limit) {
+    hash
+    text
+    mentions
+    embeds
+    timestamp
+    parentHash
+  }
+}
+```
+
+### Get Cast Replies
+
+```graphql
+query GetCastReplies($parentHash: String!, $limit: Float) {
+  getCastReplies(parentHash: $parentHash, limit: $limit) {
+    hash
+    fid
+    text
+    timestamp
+    user {
+      username
+      displayName
+    }
+  }
+}
+```
+
+### Get Casts by Mention
+
+```graphql
+query GetCastsByMention($fid: Float!, $limit: Float) {
+  getCastsByMention(fid: $fid, limit: $limit) {
+    hash
+    fid
+    text
+    mentions
+    timestamp
+    user {
+      username
+      displayName
+    }
+  }
+}
+```
+
 ## API Behavior
 
 - **Database First**: Queries check local database first for fast responses
@@ -149,7 +241,7 @@ In production mode, the daily sync job runs automatically at 2:00 AM. In develop
 
 ## Database Schema
 
-The User model includes:
+### User Model
 
 - Farcaster identity (fid, username, custody address)
 - Profile data (bio, location, banner, pfp)
@@ -157,5 +249,13 @@ The User model includes:
 - Verifications (eth/sol addresses, other platforms)
 - Pro subscription status
 - Sync metadata (last sync time, source)
+
+### Cast Model
+
+- Unique hash identifier and Farcaster ID (fid)
+- Text content with mentions array and embeds JSON
+- Parent/reply tracking (parentHash, parentFid)
+- Timestamp and user relation
+- Real-time ingestion from Farcaster Hub
 
 Built following patterns from the sendusdc-backend project.

@@ -34,6 +34,7 @@ BigInt.prototype.toJSON = function () {
 import env from 'helpers/env'
 import yoga from 'helpers/yoga'
 import { startDailyUserSync } from 'jobs/dailyUserSync'
+import startFarcasterFeedListener from 'jobs/farcasterFeedListener'
 
 const server = Bun.serve({
   fetch: yoga.fetch,
@@ -45,5 +46,9 @@ console.log(`🚀 Farcaster Data server running at http://localhost:${env.PORT}/
 // Start the daily user sync job
 startDailyUserSync()
 console.log('📅 Daily user sync job started')
+
+// Start the Farcaster feed listener to save all casts
+startFarcasterFeedListener()
+console.log('🎧 Farcaster feed listener started')
 
 export { server }

@@ -65,5 +65,48 @@ model User {
   syncSource   String @default("neynar") // "neynar", "hub", "manual"
   isActive     Boolean @default(true)
   
+  // Relations
+  casts        Cast[]
+  
   @@map("users")
+}
+
+model Cast {
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Primary identifiers
+  hash      String @id // Hex representation of the cast hash
+  fid       Int        // Author's FID
+  
+  // Cast content
+  text           String
+  originalText   String  // Text before username reconstruction
+  mentions       Int[]   // Array of mentioned FIDs
+  mentionsPositions Int[] // Positions of mentions in text
+  
+  // Cast metadata
+  timestamp      DateTime // Farcaster timestamp
+  messageType    String   // Message type from hub
+  
+  // Parent/reply information
+  parentCastFid  Int?
+  parentCastHash String?
+  
+  // Embed information (URLs, quoted casts, etc.)
+  embeds         Json?    // Store embeds as JSON
+  
+  // Processing metadata
+  processedBy    String?  // Which system processed this cast
+  isReply        Boolean  @default(false)
+  isQuoteCast    Boolean  @default(false)
+  isMention      Boolean  @default(false)
+  
+  // Relations
+  author         User     @relation(fields: [fid], references: [fid])
+  
+  @@map("casts")
+  @@index([fid])
+  @@index([timestamp])
+  @@index([parentCastFid, parentCastHash])
 }
