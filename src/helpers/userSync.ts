@@ -75,7 +75,7 @@ export async function syncUsersFromNeynar(fids: number[]) {
 
   // Process in chunks of 100 (Neynar's limit) with 100 parallel requests
   const chunkSize = 100
-  const parallelBatches = 100
+  const parallelBatches = 10
   let processed = 0
   let successful = 0
   let errors = 0
