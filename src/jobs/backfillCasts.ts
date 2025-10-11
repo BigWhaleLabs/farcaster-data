@@ -9,25 +9,22 @@ import prismaClient from 'helpers/prismaClient'
 const USERS_BATCH_SIZE = 500
 const CASTS_BATCH_SIZE = 100
 const DELAY_BETWEEN_BATCHES = 1000 // 1 second delay between user batches
-const DELAY_BETWEEN_CAST_REQUESTS = 100 // 100ms delay between cast requests
 
 export default async function backfillCasts() {
   console.log('[BACKFILL_CASTS] 🚀 Starting cast backfill process')
-  console.log(
-    `[BACKFILL_CASTS] 📊 Target Neynar score range: 0.1 to 0.5 (exclusive)`
-  )
+  console.log(`[BACKFILL_CASTS] 📊 Target Neynar score range: 0 to 1`)
 
   // First, get the total count of eligible users for progress tracking
   const totalUsers = await prismaClient.user.count({
     where: {
       AND: [
         { isActive: true },
-        {
-          score: {
-            gte: 0.1,
-            lt: 0.5,
-          },
-        },
+        // {
+        //   score: {
+        //     gte: 0.1,
+        //     lt: 0.5,
+        //   },
+        // },
       ],
     },
   })
@@ -52,12 +49,12 @@ export default async function backfillCasts() {
         where: {
           AND: [
             { isActive: true },
-            {
-              score: {
-                gte: 0.1,
-                lt: 0.5,
-              },
-            },
+            // {
+            //   score: {
+            //     gte: 0.1,
+            //     lt: 0.5,
+            //   },
+            // },
           ],
         },
         select: {
@@ -65,10 +62,7 @@ export default async function backfillCasts() {
           username: true,
           score: true,
         },
-        orderBy: [
-          { score: 'desc' },
-          { fid: 'asc' },
-        ],
+        orderBy: [{ score: 'desc' }, { fid: 'asc' }],
         take: USERS_BATCH_SIZE,
         skip: offset,
       })
