@@ -3,7 +3,6 @@ import { MessageType } from '@farcaster/hub-nodejs'
 import { uint8ArrayToHex } from 'helpers/bufferUtils'
 import farcasterEpochToUnix from 'helpers/farcasterEpochToUnix'
 import hubClient from 'helpers/hubClient'
-import minNeynarScore from 'helpers/minNeynar'
 import prismaClient from 'helpers/prismaClient'
 
 // Configuration constants
@@ -14,7 +13,9 @@ const DELAY_BETWEEN_CAST_REQUESTS = 100 // 100ms delay between cast requests
 
 export default async function backfillCasts() {
   console.log('[BACKFILL_CASTS] 🚀 Starting cast backfill process')
-  console.log(`[BACKFILL_CASTS] 📊 Min Neynar score: ${minNeynarScore}`)
+  console.log(
+    `[BACKFILL_CASTS] 📊 Target Neynar score range: 0.1 to 0.5 (exclusive)`
+  )
 
   // First, get the total count of eligible users for progress tracking
   const totalUsers = await prismaClient.user.count({
@@ -22,7 +23,10 @@ export default async function backfillCasts() {
       AND: [
         { isActive: true },
         {
-          OR: [{ score: { gte: minNeynarScore } }],
+          score: {
+            gte: 0.1,
+            lt: 0.5,
+          },
         },
       ],
     },
@@ -49,7 +53,10 @@ export default async function backfillCasts() {
           AND: [
             { isActive: true },
             {
-              OR: [{ score: { gte: minNeynarScore } }],
+              score: {
+                gte: 0.1,
+                lt: 0.5,
+              },
             },
           ],
         },
@@ -57,11 +64,9 @@ export default async function backfillCasts() {
           fid: true,
           username: true,
           score: true,
-          neynarUserScore: true,
         },
         orderBy: [
           { score: 'desc' },
-          { neynarUserScore: 'desc' },
           { fid: 'asc' },
         ],
         take: USERS_BATCH_SIZE,
@@ -145,7 +150,6 @@ async function processUserCasts(
     fid: number
     username: string | null
     score: number | null
-    neynarUserScore: number | null
   },
   batchIndex: number,
   totalUsers: number,
@@ -156,7 +160,7 @@ async function processUserCasts(
   let pageToken: Uint8Array | undefined
 
   console.log(
-    `[BACKFILL_CASTS] 👤 Processing casts for ${username || `FID ${fid}`} (score: ${user.score || user.neynarUserScore})`
+    `[BACKFILL_CASTS] 👤 Processing casts for ${username || `FID ${fid}`} (score: ${user.score})`
   )
 
   try {
@@ -310,7 +314,6 @@ export async function backfillCastsForUser(fid: number): Promise<number> {
       fid: true,
       username: true,
       score: true,
-      neynarUserScore: true,
     },
   })
 

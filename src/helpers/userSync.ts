@@ -49,7 +49,6 @@ export function neynarUserToPrismaUser(neynarUser: NeynarUser) {
     followerCount: neynarUser.follower_count,
     followingCount: neynarUser.following_count,
     score: neynarUser.score,
-    neynarUserScore: neynarUser.experimental?.neynar_user_score,
     powerBadge: neynarUser.power_badge,
     verifications: neynarUser.verifications || [],
     ethAddresses: neynarUser.verified_addresses?.eth_addresses || [],

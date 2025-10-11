@@ -42,7 +42,6 @@ model User {
   followerCount  Int?
   followingCount Int?
   score         Float?
-  neynarUserScore Float?
   powerBadge    Boolean @default(false)
   
   // Verification data  
