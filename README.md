@@ -71,6 +71,7 @@ The project includes helpful CLI commands:
 - `POSTGRES` - PostgreSQL connection string
 - `NEYNAR_API_KEY` - Your Neynar API key
 - `FARCASTER_HUB_URL` - Farcaster Hub RPC URL (optional, defaults to public hub)
+- `TELEGRAM_BOT_TOKEN` - Telegram bot token for notifications (optional)
 - `PORT` - Server port (default: 4000)
 - `NODE_ENV` - Environment mode (development/production)
 

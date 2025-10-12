@@ -4,6 +4,10 @@ import { uint8ArrayToHex } from 'helpers/bufferUtils'
 import farcasterEpochToUnix from 'helpers/farcasterEpochToUnix'
 import hubClient from 'helpers/hubClient'
 import prismaClient from 'helpers/prismaClient'
+import {
+  sendBackfillCompletionNotification,
+  sendBackfillErrorNotification,
+} from 'helpers/telegramNotifier'
 
 // Configuration constants
 const USERS_BATCH_SIZE = 500
@@ -128,6 +132,12 @@ export default async function backfillCasts() {
     console.log(`  - Casts backfilled: ${totalCastsBackfilled}`)
     console.log(`  - Errors: ${totalErrors}`)
 
+    // Send Telegram notification for successful completion
+    await sendBackfillCompletionNotification({
+      usersProcessed: processedUsers,
+      castsBackfilled: totalCastsBackfilled,
+    })
+
     return {
       usersProcessed: processedUsers,
       castsBackfilled: totalCastsBackfilled,
@@ -135,6 +145,10 @@ export default async function backfillCasts() {
     }
   } catch (error) {
     console.error('[BACKFILL_CASTS] ❌ Fatal error in backfill process:', error)
+
+    // Send Telegram notification for error
+    await sendBackfillErrorNotification(error)
+
     throw error
   }
 }
