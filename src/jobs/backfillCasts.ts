@@ -23,12 +23,12 @@ export default async function backfillCasts() {
     where: {
       AND: [
         { isActive: true },
-        // {
-        //   score: {
-        //     gte: 0.1,
-        //     lt: 0.5,
-        //   },
-        // },
+        {
+          score: {
+            gte: 0,
+            // lt: 0.5,
+          },
+        },
       ],
     },
   })
@@ -53,12 +53,12 @@ export default async function backfillCasts() {
         where: {
           AND: [
             { isActive: true },
-            // {
-            //   score: {
-            //     gte: 0.1,
-            //     lt: 0.5,
-            //   },
-            // },
+            {
+              score: {
+                gte: 0,
+                // lt: 0.5,
+              },
+            },
           ],
         },
         select: {
