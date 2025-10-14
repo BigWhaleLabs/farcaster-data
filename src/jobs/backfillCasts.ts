@@ -8,6 +8,8 @@ import prismaClient from 'helpers/prismaClient'
 import {
   sendBackfillCompletionNotification,
   sendBackfillErrorNotification,
+  sendBackfillProgressNotification,
+  sendBackfillStartNotification,
 } from 'helpers/telegramNotifier'
 
 // Configuration constants
@@ -38,9 +40,13 @@ export default async function backfillCasts() {
 
   console.log(`[BACKFILL_CASTS] 📈 Total eligible users: ${totalUsers}`)
 
+  // Send start notification
+  await sendBackfillStartNotification(totalUsers)
+
   let processedUsers = 0
   let totalCastsBackfilled = 0
   let totalErrors = 0
+  let batchNumber = 0
 
   try {
     // Get users in batches with minimum neynar score
@@ -48,8 +54,9 @@ export default async function backfillCasts() {
     let hasMoreUsers = true
 
     while (hasMoreUsers) {
+      batchNumber++
       console.log(
-        `[BACKFILL_CASTS] 👥 Fetching users batch at offset ${offset}`
+        `[BACKFILL_CASTS] 👥 Fetching users batch #${batchNumber} at offset ${offset}`
       )
 
       const users = await prismaClient.user.findMany({
@@ -118,6 +125,15 @@ export default async function backfillCasts() {
       console.log(
         `[BACKFILL_CASTS] 📊 Progress: ${processedUsers}/${totalUsers} users (${completionPercent}%), ${totalCastsBackfilled} casts, ${totalErrors} errors`
       )
+
+      // Send Telegram progress notification after each batch
+      await sendBackfillProgressNotification({
+        processedUsers,
+        totalUsers,
+        totalCastsBackfilled,
+        totalErrors,
+        batchNumber,
+      })
 
       offset += USERS_BATCH_SIZE
 

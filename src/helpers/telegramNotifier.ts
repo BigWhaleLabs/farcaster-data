@@ -34,6 +34,40 @@ export async function sendBackfillCompletionNotification(stats: {
   await sendTelegramNotification(message)
 }
 
+export async function sendBackfillStartNotification(
+  totalUsers: number
+): Promise<void> {
+  const message = `🚀 *Farcaster Cast Backfill Started*
+
+📊 *Total users to process:* ${totalUsers.toLocaleString()}
+📦 *Batch size:* 500 users
+*Started:* ${new Date().toISOString()}
+
+_Progress updates will be sent after each batch..._`
+
+  await sendTelegramNotification(message)
+}
+
+export async function sendBackfillProgressNotification(stats: {
+  processedUsers: number
+  totalUsers: number
+  totalCastsBackfilled: number
+  totalErrors: number
+  batchNumber: number
+}): Promise<void> {
+  const completionPercent = Math.round(
+    (stats.processedUsers / stats.totalUsers) * 100
+  )
+
+  const message = `📊 *Backfill Progress - Batch ${stats.batchNumber}*
+
+⏳ *Progress:* ${stats.processedUsers.toLocaleString()}/${stats.totalUsers.toLocaleString()} users (${completionPercent}%)
+📄 *Total casts:* ${stats.totalCastsBackfilled.toLocaleString()}
+${stats.totalErrors > 0 ? `⚠️ *Errors:* ${stats.totalErrors}` : '✅ *No errors so far*'}`
+
+  await sendTelegramNotification(message)
+}
+
 export async function sendBackfillErrorNotification(error: any): Promise<void> {
   const errorMessage = error?.message || String(error)
 
