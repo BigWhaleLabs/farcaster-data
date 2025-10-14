@@ -12,7 +12,7 @@ import {
 
 // Configuration constants
 const USERS_BATCH_SIZE = 500
-const CASTS_BATCH_SIZE = 100
+const CASTS_BATCH_SIZE = 10000
 const DELAY_BETWEEN_BATCHES = 1000 // 1 second delay between user batches
 
 export default async function backfillCasts() {
