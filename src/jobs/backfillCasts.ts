@@ -3,6 +3,7 @@ import { MessageType } from '@farcaster/hub-nodejs'
 import { uint8ArrayToHex } from 'helpers/bufferUtils'
 import farcasterEpochToUnix from 'helpers/farcasterEpochToUnix'
 import hubClient from 'helpers/hubClient'
+import minNeynar from 'helpers/minNeynar'
 import prismaClient from 'helpers/prismaClient'
 import {
   sendBackfillCompletionNotification,
@@ -16,7 +17,9 @@ const DELAY_BETWEEN_BATCHES = 1000 // 1 second delay between user batches
 
 export default async function backfillCasts() {
   console.log('[BACKFILL_CASTS] 🚀 Starting cast backfill process')
-  console.log(`[BACKFILL_CASTS] 📊 Target Neynar score range: 0 to 1`)
+  console.log(
+    `[BACKFILL_CASTS] 📊 Target Neynar score range: ${minNeynar} to 1`
+  )
 
   // First, get the total count of eligible users for progress tracking
   const totalUsers = await prismaClient.user.count({
@@ -25,7 +28,7 @@ export default async function backfillCasts() {
         { isActive: true },
         {
           score: {
-            gte: 0,
+            gte: minNeynar,
             // lt: 0.5,
           },
         },
@@ -55,7 +58,7 @@ export default async function backfillCasts() {
             { isActive: true },
             {
               score: {
-                gte: 0,
+                gte: minNeynar,
                 // lt: 0.5,
               },
             },
