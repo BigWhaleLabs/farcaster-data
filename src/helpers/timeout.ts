@@ -30,19 +30,20 @@ export async function withRetry<T>(
   operationName?: string
 ): Promise<T> {
   let lastError: any
-  
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await operation()
     } catch (error) {
       lastError = error
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      
+      const errorMessage =
+        error instanceof Error ? error.message : String(error)
+
       if (attempt < maxRetries) {
         console.log(
           `[RETRY] ${operationName || 'Operation'} failed (attempt ${attempt}/${maxRetries}): ${errorMessage}. Retrying in ${delayMs}ms...`
         )
-        await new Promise(resolve => setTimeout(resolve, delayMs))
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
       } else {
         console.error(
           `[RETRY] ${operationName || 'Operation'} failed after ${maxRetries} attempts: ${errorMessage}`
@@ -50,7 +51,7 @@ export async function withRetry<T>(
       }
     }
   }
-  
+
   throw lastError
 }
 
@@ -62,7 +63,12 @@ export async function withTimeoutAndRetry<T>(
   operationName?: string
 ): Promise<T> {
   return withRetry(
-    () => withTimeout(operation(), timeoutMs, `${operationName || 'Operation'} timed out after ${timeoutMs}ms`),
+    () =>
+      withTimeout(
+        operation(),
+        timeoutMs,
+        `${operationName || 'Operation'} timed out after ${timeoutMs}ms`
+      ),
     maxRetries,
     delayMs,
     operationName
