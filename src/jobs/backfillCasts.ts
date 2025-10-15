@@ -11,11 +11,14 @@ import {
   sendBackfillProgressNotification,
   sendBackfillStartNotification,
 } from 'helpers/telegramNotifier'
+import { withTimeoutAndRetry } from 'helpers/timeout'
 
 // Configuration constants
-const USERS_BATCH_SIZE = 100
+const USERS_BATCH_SIZE = 50 // Reduced for better progress tracking
 const CASTS_BATCH_SIZE = 1000
 const DELAY_BETWEEN_BATCHES = 1000 // 1 second delay between user batches
+const USER_PROCESSING_TIMEOUT = 30000 // 30 seconds timeout per user (reduced from 60s)
+const HUB_REQUEST_TIMEOUT = 15000 // 15 seconds timeout per hub request (reduced from 30s)
 
 export default async function backfillCasts() {
   console.log('[BACKFILL_CASTS] 🚀 Starting cast backfill process')
@@ -59,88 +62,120 @@ export default async function backfillCasts() {
         `[BACKFILL_CASTS] 👥 Fetching users batch #${batchNumber} at offset ${offset}`
       )
 
-      const users = await prismaClient.user.findMany({
-        where: {
-          AND: [
-            { isActive: true },
-            {
-              score: {
-                gte: minNeynar,
-                // lt: 0.5,
+      try {
+        const users = await prismaClient.user.findMany({
+          where: {
+            AND: [
+              { isActive: true },
+              {
+                score: {
+                  gte: minNeynar,
+                  // lt: 0.5,
+                },
               },
-            },
-          ],
-        },
-        select: {
-          fid: true,
-          username: true,
-          score: true,
-        },
-        orderBy: [{ score: 'desc' }, { fid: 'asc' }],
-        take: USERS_BATCH_SIZE,
-        skip: offset,
-      })
+            ],
+          },
+          select: {
+            fid: true,
+            username: true,
+            score: true,
+          },
+          orderBy: [{ score: 'desc' }, { fid: 'asc' }],
+          take: USERS_BATCH_SIZE,
+          skip: offset,
+        })
 
-      if (users.length === 0) {
-        hasMoreUsers = false
-        break
-      }
+        if (users.length === 0) {
+          hasMoreUsers = false
+          break
+        }
 
-      const currentProgress = Math.round((processedUsers / totalUsers) * 100)
-      console.log(
-        `[BACKFILL_CASTS] 📋 Processing ${users.length} users (${processedUsers + 1}-${processedUsers + users.length}) - ${currentProgress}% complete`
-      )
+        const currentProgress = Math.round((processedUsers / totalUsers) * 100)
+        console.log(
+          `[BACKFILL_CASTS] 📋 Processing ${users.length} users (${processedUsers + 1}-${processedUsers + users.length}) - ${currentProgress}% complete`
+        )
 
-      // Process users in parallel with rate limiting
-      const userPromises = users.map((user, index) =>
-        processUserCasts(user, index, totalUsers, processedUsers + index + 1)
-      )
+        // Process users in parallel with rate limiting, timeouts, and retries
+        const userPromises = users.map((user, index) =>
+          withTimeoutAndRetry(
+            () =>
+              processUserCasts(
+                user,
+                index,
+                totalUsers,
+                processedUsers + index + 1
+              ),
+            USER_PROCESSING_TIMEOUT,
+            5, // max retries
+            2000, // 2 second delay between retries
+            `Processing user ${user.fid}`
+          ).catch((error) => {
+            console.error(
+              `[BACKFILL_CASTS] ⏱️ Failed after retries for user ${user.fid}:`,
+              error.message
+            )
+            return 0 // Return 0 casts processed on timeout/error after all retries
+          })
+        )
 
-      const results = await Promise.allSettled(userPromises)
+        const results = await Promise.all(userPromises)
 
-      // Count successful vs failed results
-      let batchCasts = 0
-      let batchErrors = 0
+        // Count casts and check for any issues
+        let batchCasts = 0
+        let batchErrors = 0
 
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          batchCasts += result.value
-        } else {
-          batchErrors++
-          console.error(
-            `[BACKFILL_CASTS] ❌ Failed to process user ${users[index].fid}:`,
-            result.reason
+        results.forEach((castsCount, index) => {
+          batchCasts += castsCount
+          if (castsCount === 0) {
+            // Could be timeout or no casts - already logged in catch block
+            batchErrors++
+          }
+        })
+
+        processedUsers += users.length
+        totalCastsBackfilled += batchCasts
+        totalErrors += batchErrors
+
+        const completionPercent = Math.round(
+          (processedUsers / totalUsers) * 100
+        )
+        console.log(
+          `[BACKFILL_CASTS] 📈 Batch complete: ${batchCasts} casts, ${batchErrors} errors`
+        )
+        console.log(
+          `[BACKFILL_CASTS] 📊 Progress: ${processedUsers}/${totalUsers} users (${completionPercent}%), ${totalCastsBackfilled} casts, ${totalErrors} errors`
+        )
+
+        // Send Telegram progress notification after each batch
+        await sendBackfillProgressNotification({
+          processedUsers,
+          totalUsers,
+          totalCastsBackfilled,
+          totalErrors,
+          batchNumber,
+        })
+
+        offset += USERS_BATCH_SIZE
+
+        // Add delay between batches to avoid overwhelming the hub
+        if (hasMoreUsers) {
+          console.log(
+            `[BACKFILL_CASTS] ⏸️ Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch`
           )
         }
-      })
+      } catch (batchError) {
+        console.error(
+          `[BACKFILL_CASTS] ❌ Error processing batch #${batchNumber}:`,
+          batchError
+        )
+        totalErrors++
 
-      processedUsers += users.length
-      totalCastsBackfilled += batchCasts
-      totalErrors += batchErrors
+        // Continue to next batch despite error
+        offset += USERS_BATCH_SIZE
 
-      const completionPercent = Math.round((processedUsers / totalUsers) * 100)
-      console.log(
-        `[BACKFILL_CASTS] 📈 Batch complete: ${batchCasts} casts, ${batchErrors} errors`
-      )
-      console.log(
-        `[BACKFILL_CASTS] 📊 Progress: ${processedUsers}/${totalUsers} users (${completionPercent}%), ${totalCastsBackfilled} casts, ${totalErrors} errors`
-      )
-
-      // Send Telegram progress notification after each batch
-      await sendBackfillProgressNotification({
-        processedUsers,
-        totalUsers,
-        totalCastsBackfilled,
-        totalErrors,
-        batchNumber,
-      })
-
-      offset += USERS_BATCH_SIZE
-
-      // Add delay between batches to avoid overwhelming the hub
-      if (hasMoreUsers) {
-        console.log(
-          `[BACKFILL_CASTS] ⏸️ Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch`
+        // Add delay before retry
+        await new Promise((resolve) =>
+          setTimeout(resolve, DELAY_BETWEEN_BATCHES * 2)
         )
       }
     }
@@ -198,11 +233,18 @@ async function processUserCasts(
       pageCount++
 
       try {
-        const castsResult = await hubClient.getCastsByFid({
-          fid,
-          pageSize: CASTS_BATCH_SIZE,
-          pageToken,
-        })
+        const castsResult = await withTimeoutAndRetry(
+          () =>
+            hubClient.getCastsByFid({
+              fid,
+              pageSize: CASTS_BATCH_SIZE,
+              pageToken,
+            }),
+          HUB_REQUEST_TIMEOUT,
+          5, // max retries
+          1000, // delay between retries
+          `Hub request for FID ${fid}`
+        )
 
         if (castsResult.isErr()) {
           console.error(

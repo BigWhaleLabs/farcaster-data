@@ -1,5 +1,6 @@
 import { Bot } from 'grammy'
 import env from 'helpers/env'
+import minNeynar from 'helpers/minNeynar'
 
 const NOTIFICATION_CHAT_ID = '76104711'
 
@@ -40,7 +41,8 @@ export async function sendBackfillStartNotification(
   const message = `🚀 *Farcaster Cast Backfill Started*
 
 📊 *Total users to process:* ${totalUsers.toLocaleString()}
-📦 *Batch size:* 500 users
+📦 *Batch size:* 50 users
+📈 *Score range:* ${minNeynar} and above (inclusive)
 *Started:* ${new Date().toISOString()}
 
 _Progress updates will be sent after each batch..._`
@@ -63,7 +65,8 @@ export async function sendBackfillProgressNotification(stats: {
 
 ⏳ *Progress:* ${stats.processedUsers.toLocaleString()}/${stats.totalUsers.toLocaleString()} users (${completionPercent}%)
 📄 *Total casts:* ${stats.totalCastsBackfilled.toLocaleString()}
-${stats.totalErrors > 0 ? `⚠️ *Errors:* ${stats.totalErrors}` : '✅ *No errors so far*'}`
+${stats.totalErrors > 0 ? `⚠️ *Errors:* ${stats.totalErrors}` : '✅ *No errors so far*'}
+📈 *Score:* ${minNeynar}+ (inclusive)`
 
   await sendTelegramNotification(message)
 }
@@ -73,7 +76,8 @@ export async function sendBackfillErrorNotification(error: any): Promise<void> {
 
   const message = `❌ *Farcaster Cast Backfill Failed*
 
-🚨 *Error:* ${errorMessage}`
+🚨 *Error:* ${errorMessage}
+📈 *Score range:* ${minNeynar}+ (inclusive)`
 
   await sendTelegramNotification(message)
 }
