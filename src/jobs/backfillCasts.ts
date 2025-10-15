@@ -50,6 +50,7 @@ export default async function backfillCasts() {
   let totalCastsBackfilled = 0
   let totalErrors = 0
   let batchNumber = 0
+  const errorMessages = new Map<string, number>() // Track error messages and their counts
 
   try {
     // Get users in batches with minimum neynar score
@@ -106,29 +107,37 @@ export default async function backfillCasts() {
                 processedUsers + index + 1
               ),
             USER_PROCESSING_TIMEOUT,
-            5, // max retries
+            10, // max retries (increased to 10)
             2000, // 2 second delay between retries
             `Processing user ${user.fid}`
-          ).catch((error) => {
-            console.error(
-              `[BACKFILL_CASTS] ⏱️ Failed after retries for user ${user.fid}:`,
-              error.message
-            )
-            return 0 // Return 0 casts processed on timeout/error after all retries
-          })
+          )
+            .then((castsCount) => ({ castsCount, error: null }))
+            .catch((error) => {
+              const errorMessage = error.message || String(error)
+              console.error(
+                `[BACKFILL_CASTS] ⏱️ Failed after 10 retries for user ${user.fid}:`,
+                errorMessage
+              )
+              return { castsCount: -1, error: errorMessage } // Return error message
+            })
         )
 
         const results = await Promise.all(userPromises)
 
-        // Count casts and check for any issues
+        // Count casts and errors - track error messages
         let batchCasts = 0
         let batchErrors = 0
 
-        results.forEach((castsCount, index) => {
-          batchCasts += castsCount
-          if (castsCount === 0) {
-            // Could be timeout or no casts - already logged in catch block
+        results.forEach((result) => {
+          if (result.castsCount === -1 && result.error) {
+            // Failed after all retries - count as error
             batchErrors++
+            // Track error message count
+            const count = errorMessages.get(result.error) || 0
+            errorMessages.set(result.error, count + 1)
+          } else if (result.castsCount >= 0) {
+            // Successfully processed (could be 0 casts for a user with no casts)
+            batchCasts += result.castsCount
           }
         })
 
@@ -153,6 +162,7 @@ export default async function backfillCasts() {
           totalCastsBackfilled,
           totalErrors,
           batchNumber,
+          errorMessages: Object.fromEntries(errorMessages),
         })
 
         offset += USERS_BATCH_SIZE
@@ -241,7 +251,7 @@ async function processUserCasts(
               pageToken,
             }),
           HUB_REQUEST_TIMEOUT,
-          5, // max retries
+          10, // max retries (increased to 10)
           1000, // delay between retries
           `Hub request for FID ${fid}`
         )

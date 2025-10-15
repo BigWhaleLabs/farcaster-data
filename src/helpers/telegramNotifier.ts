@@ -56,17 +56,36 @@ export async function sendBackfillProgressNotification(stats: {
   totalCastsBackfilled: number
   totalErrors: number
   batchNumber: number
+  errorMessages?: Record<string, number>
 }): Promise<void> {
   const completionPercent = Math.round(
     (stats.processedUsers / stats.totalUsers) * 100
   )
+
+  // Build error breakdown if there are errors
+  let errorBreakdown = ''
+  if (stats.totalErrors > 0 && stats.errorMessages) {
+    const errorEntries = Object.entries(stats.errorMessages)
+      .sort(([, a], [, b]) => b - a) // Sort by count, descending
+      .slice(0, 5) // Top 5 errors
+      .map(([msg, count]) => {
+        // Truncate long error messages
+        const shortMsg = msg.length > 50 ? msg.substring(0, 47) + '...' : msg
+        return `  • ${shortMsg}: ${count}x`
+      })
+      .join('\n')
+
+    if (errorEntries) {
+      errorBreakdown = `\n\n*Error breakdown:*\n${errorEntries}`
+    }
+  }
 
   const message = `📊 *Backfill Progress - Batch ${stats.batchNumber}*
 
 ⏳ *Progress:* ${stats.processedUsers.toLocaleString()}/${stats.totalUsers.toLocaleString()} users (${completionPercent}%)
 📄 *Total casts:* ${stats.totalCastsBackfilled.toLocaleString()}
 ${stats.totalErrors > 0 ? `⚠️ *Errors:* ${stats.totalErrors}` : '✅ *No errors so far*'}
-📈 *Score:* ${minNeynar}+ (inclusive)`
+📈 *Score:* ${minNeynar}+ (inclusive)${errorBreakdown}`
 
   await sendTelegramNotification(message)
 }
