@@ -87,7 +87,7 @@ export async function sendBackfillProgressNotification(stats: {
 📄 *Total casts:* ${stats.totalCastsBackfilled.toLocaleString()}
 ${stats.totalErrors > 0 ? `⚠️ *Errors:* ${stats.totalErrors}` : '✅ *No errors so far*'}
 ${stats.failedUserCount ? `🚫 *Permanently failed:* ${stats.failedUserCount} users (skipped in future batches)` : ''}
-📈 *Score:* ${minNeynar}+ (inclusive)${errorBreakdown}`
+${errorBreakdown}`
 
   await sendTelegramNotification(message)
 }
