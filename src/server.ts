@@ -2,14 +2,19 @@ import 'core-js'
 import 'reflect-metadata'
 
 import 'dotenv/config'
+import { sendTelegramNotification } from 'helpers/telegramNotifier'
 
 // Add global error handlers to prevent server crashes
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error)
+  sendTelegramNotification(
+    `[Farcaster Data] Uncaught Exception: ${error.message}`
+  )
 })
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason)
+  sendTelegramNotification(`[Farcaster Data] Unhandled Rejection: ${reason}`)
 })
 
 // Handle BigInt serialization for GraphQL

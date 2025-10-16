@@ -93,15 +93,21 @@ export default async function backfillCasts() {
         }
 
         // Filter out users that have already failed
-        const usersToProcess = users.filter(user => !failedUserFids.has(user.fid))
-        
+        const usersToProcess = users.filter(
+          (user) => !failedUserFids.has(user.fid)
+        )
+
         if (usersToProcess.length === 0) {
-          console.log(`[BACKFILL_CASTS] ⏭️ Skipping batch - all users have previously failed`)
+          console.log(
+            `[BACKFILL_CASTS] ⏭️ Skipping batch - all users have previously failed`
+          )
           offset += USERS_BATCH_SIZE
           continue
         }
 
-        console.log(`[BACKFILL_CASTS] 👥 Processing ${usersToProcess.length} users (${users.length - usersToProcess.length} skipped as previously failed)`)
+        console.log(
+          `[BACKFILL_CASTS] 👥 Processing ${usersToProcess.length} users (${users.length - usersToProcess.length} skipped as previously failed)`
+        )
 
         const currentProgress = Math.round((processedUsers / totalUsers) * 100)
         console.log(
