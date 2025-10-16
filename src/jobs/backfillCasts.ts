@@ -14,7 +14,7 @@ import {
 import { withTimeoutAndRetry } from 'helpers/timeout'
 
 // Configuration constants
-const USERS_BATCH_SIZE = 50 // Reduced for better progress tracking
+const USERS_BATCH_SIZE = 100 // Reduced for better progress tracking
 const CASTS_BATCH_SIZE = 1000
 const DELAY_BETWEEN_BATCHES = 1000 // 1 second delay between user batches
 const USER_PROCESSING_TIMEOUT = 30000 // 30 seconds timeout per user (reduced from 60s)
@@ -192,6 +192,9 @@ export default async function backfillCasts() {
         if (hasMoreUsers) {
           console.log(
             `[BACKFILL_CASTS] ⏸️ Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch`
+          )
+          await new Promise((resolve) =>
+            setTimeout(resolve, DELAY_BETWEEN_BATCHES)
           )
         }
       } catch (batchError) {
