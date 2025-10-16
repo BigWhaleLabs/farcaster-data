@@ -334,9 +334,9 @@ async function processUserCasts(
       }
     }
 
-    console.log(
-      `[BACKFILL_CASTS] ✅ Completed ${username || `FID ${fid}`}: ${castsProcessed} casts processed in ${pageCount} pages`
-    )
+    // console.log(
+    //   `[BACKFILL_CASTS] ✅ Completed ${username || `FID ${fid}`}: ${castsProcessed} casts processed in ${pageCount} pages`
+    // )
 
     return castsProcessed
   } catch (error) {
