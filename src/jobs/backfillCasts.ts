@@ -60,9 +60,9 @@ export default async function backfillCasts() {
 
     while (hasMoreUsers) {
       batchNumber++
-      console.log(
-        `[BACKFILL_CASTS] 👥 Fetching users batch #${batchNumber} at offset ${offset}`
-      )
+      // console.log(
+      //   `[BACKFILL_CASTS] 👥 Fetching users batch #${batchNumber} at offset ${offset}`
+      // )
 
       try {
         const users = await prismaClient.user.findMany({
@@ -98,21 +98,21 @@ export default async function backfillCasts() {
         )
 
         if (usersToProcess.length === 0) {
-          console.log(
-            `[BACKFILL_CASTS] ⏭️ Skipping batch - all users have previously failed`
-          )
+          // console.log(
+          //   `[BACKFILL_CASTS] ⏭️ Skipping batch - all users have previously failed`
+          // )
           offset += USERS_BATCH_SIZE
           continue
         }
 
-        console.log(
-          `[BACKFILL_CASTS] 👥 Processing ${usersToProcess.length} users (${users.length - usersToProcess.length} skipped as previously failed)`
-        )
+        // console.log(
+        //   `[BACKFILL_CASTS] 👥 Processing ${usersToProcess.length} users (${users.length - usersToProcess.length} skipped as previously failed)`
+        // )
 
         const currentProgress = Math.round((processedUsers / totalUsers) * 100)
-        console.log(
-          `[BACKFILL_CASTS] 📋 Processing ${usersToProcess.length} users (${processedUsers + 1}-${processedUsers + usersToProcess.length}) - ${currentProgress}% complete`
-        )
+        // console.log(
+        //   `[BACKFILL_CASTS] 📋 Processing ${usersToProcess.length} users (${processedUsers + 1}-${processedUsers + usersToProcess.length}) - ${currentProgress}% complete`
+        // )
 
         // Process users in parallel with rate limiting, timeouts, and retries
         const userPromises = usersToProcess.map((user, index) =>
@@ -168,12 +168,12 @@ export default async function backfillCasts() {
         const completionPercent = Math.round(
           (processedUsers / totalUsers) * 100
         )
-        console.log(
-          `[BACKFILL_CASTS] 📈 Batch complete: ${batchCasts} casts, ${batchErrors} errors`
-        )
-        console.log(
-          `[BACKFILL_CASTS] 📊 Progress: ${processedUsers}/${totalUsers} users (${completionPercent}%), ${totalCastsBackfilled} casts, ${totalErrors} errors, ${failedUserFids.size} permanently failed`
-        )
+        // console.log(
+        //   `[BACKFILL_CASTS] 📈 Batch complete: ${batchCasts} casts, ${batchErrors} errors`
+        // )
+        // console.log(
+        //   `[BACKFILL_CASTS] 📊 Progress: ${processedUsers}/${totalUsers} users (${completionPercent}%), ${totalCastsBackfilled} casts, ${totalErrors} errors, ${failedUserFids.size} permanently failed`
+        // )
 
         // Send Telegram progress notification after each batch
         await sendBackfillProgressNotification({
@@ -190,9 +190,9 @@ export default async function backfillCasts() {
 
         // Add delay between batches to avoid overwhelming the hub
         if (hasMoreUsers) {
-          console.log(
-            `[BACKFILL_CASTS] ⏸️ Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch`
-          )
+          // console.log(
+          //   `[BACKFILL_CASTS] ⏸️ Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch`
+          // )
           await new Promise((resolve) =>
             setTimeout(resolve, DELAY_BETWEEN_BATCHES)
           )
@@ -255,9 +255,9 @@ async function processUserCasts(
   let castsProcessed = 0
   let pageToken: Uint8Array | undefined
 
-  console.log(
-    `[BACKFILL_CASTS] 👤 Processing casts for ${username || `FID ${fid}`} (score: ${user.score})`
-  )
+  // console.log(
+  //   `[BACKFILL_CASTS] 👤 Processing casts for ${username || `FID ${fid}`} (score: ${user.score})`
+  // )
 
   try {
     let hasMoreCasts = true
@@ -293,9 +293,9 @@ async function processUserCasts(
         const progressPercent = Math.round(
           (currentUserIndex / totalUsers) * 100
         )
-        console.log(
-          `[BACKFILL_CASTS] 📄 Page ${pageCount} for ${username || `FID ${fid}`}: ${messages.length} casts (User ${currentUserIndex}/${totalUsers} - ${progressPercent}%)`
-        )
+        // console.log(
+        //   `[BACKFILL_CASTS] 📄 Page ${pageCount} for ${username || `FID ${fid}`}: ${messages.length} casts (User ${currentUserIndex}/${totalUsers} - ${progressPercent}%)`
+        // )
 
         if (messages.length === 0) {
           hasMoreCasts = false
