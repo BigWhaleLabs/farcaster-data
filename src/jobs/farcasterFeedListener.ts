@@ -303,9 +303,9 @@ async function saveCastToDatabase(message: Message) {
       },
     })
 
-    console.log(
-      `[FARCASTER_FEED] ✅ Saved cast ${hash.substring(0, 8)}... by FID ${fid}: "${text.substring(0, 50)}..."${isReply ? ' [REPLY]' : ''}${isQuoteCast ? ' [QUOTE]' : ''}${isMention ? ' [MENTION]' : ''}`
-    )
+    // console.log(
+    //   `[FARCASTER_FEED] ✅ Saved cast ${hash.substring(0, 8)}... by FID ${fid}: "${text.substring(0, 50)}..."${isReply ? ' [REPLY]' : ''}${isQuoteCast ? ' [QUOTE]' : ''}${isMention ? ' [MENTION]' : ''}`
+    // )
   } catch (error) {
     console.error(`[FARCASTER_FEED] ❌ Error saving cast ${hash}:`, error)
   }
