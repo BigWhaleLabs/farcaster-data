@@ -348,6 +348,34 @@ async function processUserCasts(
   }
 }
 
+// Helper function to safely serialize embeds data
+function safeSerializeEmbeds(embeds: any): any {
+  if (!embeds) return null
+
+  try {
+    // Convert to JSON string and back to sanitize
+    const jsonStr = JSON.stringify(embeds)
+    return JSON.parse(jsonStr)
+  } catch (error) {
+    // If serialization fails, try to clean the data
+    console.warn(
+      '[BACKFILL_CASTS] ⚠️ Failed to serialize embeds, attempting cleanup'
+    )
+    try {
+      // Convert to string and remove any problematic characters
+      const cleanStr = JSON.stringify(embeds).replace(
+        /[\x00-\x1F\x7F-\x9F]/g,
+        ''
+      )
+      return JSON.parse(cleanStr)
+    } catch {
+      // If all else fails, return null to skip embeds
+      console.warn('[BACKFILL_CASTS] ⚠️ Could not clean embeds, skipping')
+      return null
+    }
+  }
+}
+
 async function processCastMessage(message: CastAddMessage): Promise<boolean> {
   if (!message.data?.castAddBody?.text || !message.data?.fid || !message.hash) {
     return false
@@ -377,6 +405,9 @@ async function processCastMessage(message: CastAddMessage): Promise<boolean> {
       ) || false
     const isMention = (castAddBody.mentions?.length || 0) > 0
 
+    // Safely serialize embeds
+    const embedsData = safeSerializeEmbeds(castAddBody.embeds)
+
     // Create the cast record
     await prismaClient.cast.create({
       data: {
@@ -392,9 +423,7 @@ async function processCastMessage(message: CastAddMessage): Promise<boolean> {
         parentCastHash: castAddBody.parentCastId?.hash
           ? uint8ArrayToHex(castAddBody.parentCastId.hash)
           : null,
-        embeds: castAddBody.embeds
-          ? JSON.parse(JSON.stringify(castAddBody.embeds))
-          : null,
+        embeds: embedsData,
         processedBy: 'backfill-job',
         isReply,
         isQuoteCast,
@@ -404,7 +433,15 @@ async function processCastMessage(message: CastAddMessage): Promise<boolean> {
 
     return true
   } catch (error) {
-    console.error(`[BACKFILL_CASTS] ❌ Error saving cast ${hash}:`, error)
+    // Only log if it's not a known parsing error
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    if (
+      !errorMsg.includes('unexpected end of hex escape') &&
+      !errorMsg.includes('InvalidArg')
+    ) {
+      console.error(`[BACKFILL_CASTS] ❌ Error saving cast ${hash}:`, error)
+    }
+    // Always return false to skip problematic casts
     return false
   }
 }

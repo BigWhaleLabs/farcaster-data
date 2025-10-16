@@ -237,6 +237,34 @@ async function processEvent(event: unknown) {
   await saveCastToDatabase(message)
 }
 
+// Helper function to safely serialize embeds data
+function safeSerializeEmbeds(embeds: any): any {
+  if (!embeds) return null
+
+  try {
+    // Convert to JSON string and back to sanitize
+    const jsonStr = JSON.stringify(embeds)
+    return JSON.parse(jsonStr)
+  } catch (error) {
+    // If serialization fails, try to clean the data
+    console.warn(
+      '[FARCASTER_FEED] ⚠️ Failed to serialize embeds, attempting cleanup'
+    )
+    try {
+      // Convert to string and remove any problematic characters
+      const cleanStr = JSON.stringify(embeds).replace(
+        /[\x00-\x1F\x7F-\x9F]/g,
+        ''
+      )
+      return JSON.parse(cleanStr)
+    } catch {
+      // If all else fails, return null to skip embeds
+      console.warn('[FARCASTER_FEED] ⚠️ Could not clean embeds, skipping')
+      return null
+    }
+  }
+}
+
 async function saveCastToDatabase(message: Message) {
   if (!message.data?.castAddBody?.text || !message.data?.fid || !message.hash) {
     return
@@ -254,7 +282,7 @@ async function saveCastToDatabase(message: Message) {
     })
 
     if (existingCast) {
-      console.log(`[FARCASTER_FEED] 📝 Cast ${hash} already exists, skipping`)
+      // console.log(`[FARCASTER_FEED] 📝 Cast ${hash} already exists, skipping`)
       return
     }
 
@@ -278,6 +306,9 @@ async function saveCastToDatabase(message: Message) {
       ) || false
     const isMention = (castAddBody.mentions?.length || 0) > 0
 
+    // Safely serialize embeds
+    const embedsData = safeSerializeEmbeds(castAddBody.embeds)
+
     // Create the cast record
     const cast = await prismaClient.cast.create({
       data: {
@@ -293,9 +324,7 @@ async function saveCastToDatabase(message: Message) {
         parentCastHash: castAddBody.parentCastId?.hash
           ? uint8ArrayToHex(castAddBody.parentCastId.hash)
           : null,
-        embeds: castAddBody.embeds
-          ? JSON.parse(JSON.stringify(castAddBody.embeds))
-          : null,
+        embeds: embedsData,
         processedBy: 'farcaster-feed-listener',
         isReply,
         isQuoteCast,
@@ -307,7 +336,15 @@ async function saveCastToDatabase(message: Message) {
     //   `[FARCASTER_FEED] ✅ Saved cast ${hash.substring(0, 8)}... by FID ${fid}: "${text.substring(0, 50)}..."${isReply ? ' [REPLY]' : ''}${isQuoteCast ? ' [QUOTE]' : ''}${isMention ? ' [MENTION]' : ''}`
     // )
   } catch (error) {
-    console.error(`[FARCASTER_FEED] ❌ Error saving cast ${hash}:`, error)
+    // Only log if it's not a known parsing error that we're skipping
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    if (
+      !errorMsg.includes('unexpected end of hex escape') &&
+      !errorMsg.includes('InvalidArg')
+    ) {
+      console.error(`[FARCASTER_FEED] ❌ Error saving cast ${hash}:`, error)
+    }
+    // Skip problematic casts silently
   }
 }
 
