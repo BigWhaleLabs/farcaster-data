@@ -6,18 +6,10 @@ import 'dotenv/config'
 // Add global error handlers to prevent server crashes
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error)
-  // Don't exit in production, just log the error
-  if (process.env.NODE_ENV !== 'production') {
-    process.exit(1)
-  }
 })
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason)
-  // Don't exit in production, just log the error
-  if (process.env.NODE_ENV !== 'production') {
-    process.exit(1)
-  }
 })
 
 // Handle BigInt serialization for GraphQL

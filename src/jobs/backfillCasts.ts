@@ -51,6 +51,7 @@ export default async function backfillCasts() {
   let totalErrors = 0
   let batchNumber = 0
   const errorMessages = new Map<string, number>() // Track error messages and their counts
+  const failedUserFids = new Set<number>() // Track FIDs that have failed after all retries
 
   try {
     // Get users in batches with minimum neynar score
@@ -91,13 +92,24 @@ export default async function backfillCasts() {
           break
         }
 
+        // Filter out users that have already failed
+        const usersToProcess = users.filter(user => !failedUserFids.has(user.fid))
+        
+        if (usersToProcess.length === 0) {
+          console.log(`[BACKFILL_CASTS] ⏭️ Skipping batch - all users have previously failed`)
+          offset += USERS_BATCH_SIZE
+          continue
+        }
+
+        console.log(`[BACKFILL_CASTS] 👥 Processing ${usersToProcess.length} users (${users.length - usersToProcess.length} skipped as previously failed)`)
+
         const currentProgress = Math.round((processedUsers / totalUsers) * 100)
         console.log(
-          `[BACKFILL_CASTS] 📋 Processing ${users.length} users (${processedUsers + 1}-${processedUsers + users.length}) - ${currentProgress}% complete`
+          `[BACKFILL_CASTS] 📋 Processing ${usersToProcess.length} users (${processedUsers + 1}-${processedUsers + usersToProcess.length}) - ${currentProgress}% complete`
         )
 
         // Process users in parallel with rate limiting, timeouts, and retries
-        const userPromises = users.map((user, index) =>
+        const userPromises = usersToProcess.map((user, index) =>
           withTimeoutAndRetry(
             () =>
               processUserCasts(
@@ -128,10 +140,12 @@ export default async function backfillCasts() {
         let batchCasts = 0
         let batchErrors = 0
 
-        results.forEach((result) => {
+        results.forEach((result, index) => {
           if (result.castsCount === -1 && result.error) {
-            // Failed after all retries - count as error
+            // Failed after all retries - count as error and track FID
+            const failedUser = usersToProcess[index]
             batchErrors++
+            failedUserFids.add(failedUser.fid)
             // Track error message count
             const count = errorMessages.get(result.error) || 0
             errorMessages.set(result.error, count + 1)
@@ -152,7 +166,7 @@ export default async function backfillCasts() {
           `[BACKFILL_CASTS] 📈 Batch complete: ${batchCasts} casts, ${batchErrors} errors`
         )
         console.log(
-          `[BACKFILL_CASTS] 📊 Progress: ${processedUsers}/${totalUsers} users (${completionPercent}%), ${totalCastsBackfilled} casts, ${totalErrors} errors`
+          `[BACKFILL_CASTS] 📊 Progress: ${processedUsers}/${totalUsers} users (${completionPercent}%), ${totalCastsBackfilled} casts, ${totalErrors} errors, ${failedUserFids.size} permanently failed`
         )
 
         // Send Telegram progress notification after each batch
@@ -163,6 +177,7 @@ export default async function backfillCasts() {
           totalErrors,
           batchNumber,
           errorMessages: Object.fromEntries(errorMessages),
+          failedUserCount: failedUserFids.size,
         })
 
         offset += USERS_BATCH_SIZE

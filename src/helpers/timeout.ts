@@ -33,7 +33,14 @@ export async function withRetry<T>(
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await operation()
+      const result = await operation()
+      // Success! Return immediately without logging errors from previous attempts
+      if (attempt > 1) {
+        console.log(
+          `[RETRY] ${operationName || 'Operation'} succeeded on attempt ${attempt}/${maxRetries}`
+        )
+      }
+      return result
     } catch (error) {
       lastError = error
       const errorMessage =

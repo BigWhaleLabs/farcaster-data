@@ -57,6 +57,7 @@ export async function sendBackfillProgressNotification(stats: {
   totalErrors: number
   batchNumber: number
   errorMessages?: Record<string, number>
+  failedUserCount?: number
 }): Promise<void> {
   const completionPercent = Math.round(
     (stats.processedUsers / stats.totalUsers) * 100
@@ -85,6 +86,7 @@ export async function sendBackfillProgressNotification(stats: {
 ⏳ *Progress:* ${stats.processedUsers.toLocaleString()}/${stats.totalUsers.toLocaleString()} users (${completionPercent}%)
 📄 *Total casts:* ${stats.totalCastsBackfilled.toLocaleString()}
 ${stats.totalErrors > 0 ? `⚠️ *Errors:* ${stats.totalErrors}` : '✅ *No errors so far*'}
+${stats.failedUserCount ? `🚫 *Permanently failed:* ${stats.failedUserCount} users (skipped in future batches)` : ''}
 📈 *Score:* ${minNeynar}+ (inclusive)${errorBreakdown}`
 
   await sendTelegramNotification(message)
