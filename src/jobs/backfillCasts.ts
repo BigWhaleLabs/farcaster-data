@@ -16,7 +16,7 @@ import { withTimeoutAndRetry } from 'helpers/timeout'
 // Configuration constants
 const USERS_BATCH_SIZE = 100 // Reduced for better progress tracking
 const CASTS_BATCH_SIZE = 1000
-const DELAY_BETWEEN_BATCHES = 1000 // 1 second delay between user batches
+const DELAY_BETWEEN_BATCHES = 100 // 1 second delay between user batches
 const USER_PROCESSING_TIMEOUT = 30000 // 30 seconds timeout per user (reduced from 60s)
 const HUB_REQUEST_TIMEOUT = 15000 // 15 seconds timeout per hub request (reduced from 30s)
 
