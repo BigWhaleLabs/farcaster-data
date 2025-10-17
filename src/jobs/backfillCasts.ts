@@ -14,11 +14,12 @@ import {
 import { withTimeoutAndRetry } from 'helpers/timeout'
 
 // Configuration constants
-const USERS_BATCH_SIZE = 10 // Reduced for better progress tracking
+const USERS_BATCH_SIZE = 50 // Reduced for better progress tracking
 const CASTS_BATCH_SIZE = 1000
-const DELAY_BETWEEN_BATCHES = 100 // 1 second delay between user batches
+const DELAY_BETWEEN_BATCHES = 1000 // 1 second delay between user batches
 const USER_PROCESSING_TIMEOUT = 30000 // 30 seconds timeout per user (reduced from 60s)
 const HUB_REQUEST_TIMEOUT = 15000 // 15 seconds timeout per hub request (reduced from 30s)
+const BACKFILL_JOB_NAME = 'cast-backfill'
 
 export default async function backfillCasts() {
   console.log('[BACKFILL_CASTS] 🚀 Starting cast backfill process')
@@ -43,19 +44,71 @@ export default async function backfillCasts() {
 
   console.log(`[BACKFILL_CASTS] 📈 Total eligible users: ${totalUsers}`)
 
-  // Send start notification
-  await sendBackfillStartNotification(totalUsers)
+  // Check if we have existing progress to resume from
+  let progressRecord = await prismaClient.backfillProgress.findUnique({
+    where: { jobName: BACKFILL_JOB_NAME },
+  })
 
+  let offset = 0
   let processedUsers = 0
   let totalCastsBackfilled = 0
   let totalErrors = 0
   let batchNumber = 0
+  let failedUserFids = new Set<number>()
+
+  if (progressRecord && progressRecord.status === 'running') {
+    // Resume from saved progress
+    offset = progressRecord.offset
+    processedUsers = progressRecord.processedUsers
+    totalCastsBackfilled = progressRecord.castsBackfilled
+    totalErrors = progressRecord.errorCount
+    batchNumber = progressRecord.lastBatchNumber
+
+    // Restore failed user FIDs from JSON
+    if (progressRecord.failedUserFids) {
+      const fids = progressRecord.failedUserFids as number[]
+      failedUserFids = new Set(fids)
+    }
+
+    console.log('[BACKFILL_CASTS] 🔄 Resuming from previous progress:')
+    console.log(`  - Offset: ${offset}`)
+    console.log(`  - Processed users: ${processedUsers}/${totalUsers}`)
+    console.log(`  - Casts backfilled: ${totalCastsBackfilled}`)
+    console.log(`  - Errors: ${totalErrors}`)
+    console.log(`  - Failed users: ${failedUserFids.size}`)
+    console.log(`  - Last batch: ${batchNumber}`)
+  } else {
+    // Create new progress record
+    progressRecord = await prismaClient.backfillProgress.upsert({
+      where: { jobName: BACKFILL_JOB_NAME },
+      create: {
+        jobName: BACKFILL_JOB_NAME,
+        totalUsers,
+        status: 'running',
+      },
+      update: {
+        totalUsers,
+        status: 'running',
+        startedAt: new Date(),
+        completedAt: null,
+        offset: 0,
+        processedUsers: 0,
+        castsBackfilled: 0,
+        errorCount: 0,
+        lastBatchNumber: 0,
+        failedUserFids: [],
+      },
+    })
+    console.log('[BACKFILL_CASTS] 🆕 Starting new backfill job')
+  }
+
+  // Send start notification
+  await sendBackfillStartNotification(totalUsers)
+
   const errorMessages = new Map<string, number>() // Track error messages and their counts
-  const failedUserFids = new Set<number>() // Track FIDs that have failed after all retries
 
   try {
     // Get users in batches with minimum neynar score
-    let offset = 0
     let hasMoreUsers = true
 
     while (hasMoreUsers) {
@@ -152,9 +205,11 @@ export default async function backfillCasts() {
             const failedUser = usersToProcess[index]
             batchErrors++
             failedUserFids.add(failedUser.fid)
-            // Track error message count
-            const count = errorMessages.get(result.error) || 0
-            errorMessages.set(result.error, count + 1)
+            // Track error message count (limit map size to prevent memory issues)
+            if (errorMessages.size < 1000) {
+              const count = errorMessages.get(result.error) || 0
+              errorMessages.set(result.error, count + 1)
+            }
           } else if (result.castsCount >= 0) {
             // Successfully processed (could be 0 casts for a user with no casts)
             batchCasts += result.castsCount
@@ -184,6 +239,20 @@ export default async function backfillCasts() {
           batchNumber,
           errorMessages: Object.fromEntries(errorMessages),
           failedUserCount: failedUserFids.size,
+        })
+
+        // Save progress to database for resume capability
+        await prismaClient.backfillProgress.update({
+          where: { jobName: BACKFILL_JOB_NAME },
+          data: {
+            offset,
+            processedUsers,
+            castsBackfilled: totalCastsBackfilled,
+            errorCount: totalErrors,
+            lastBatchNumber: batchNumber,
+            failedUserFids: Array.from(failedUserFids),
+            lastProgressAt: new Date(),
+          },
         })
 
         offset += USERS_BATCH_SIZE
@@ -220,6 +289,18 @@ export default async function backfillCasts() {
     console.log(`  - Casts backfilled: ${totalCastsBackfilled}`)
     console.log(`  - Errors: ${totalErrors}`)
 
+    // Mark job as completed in database
+    await prismaClient.backfillProgress.update({
+      where: { jobName: BACKFILL_JOB_NAME },
+      data: {
+        status: 'completed',
+        completedAt: new Date(),
+        processedUsers,
+        castsBackfilled: totalCastsBackfilled,
+        errorCount: totalErrors,
+      },
+    })
+
     // Send Telegram notification for successful completion
     await sendBackfillCompletionNotification({
       usersProcessed: processedUsers,
@@ -233,6 +314,14 @@ export default async function backfillCasts() {
     }
   } catch (error) {
     console.error('[BACKFILL_CASTS] ❌ Fatal error in backfill process:', error)
+
+    // Mark job as failed in database
+    await prismaClient.backfillProgress.update({
+      where: { jobName: BACKFILL_JOB_NAME },
+      data: {
+        status: 'failed',
+      },
+    })
 
     // Send Telegram notification for error
     await sendBackfillErrorNotification(error)

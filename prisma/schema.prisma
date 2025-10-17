@@ -104,8 +104,38 @@ model Cast {
   // Relations
   author         User     @relation(fields: [fid], references: [fid])
   
-  @@map("casts")
+    @@map("casts")
   @@index([fid])
   @@index([timestamp])
   @@index([parentCastFid, parentCastHash])
+}
+
+model BackfillProgress {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Job identification
+  jobName   String   @unique // e.g., "cast-backfill"
+  
+  // Progress tracking
+  offset           Int      @default(0) // Current offset in the user list
+  processedUsers   Int      @default(0) // Total users processed
+  totalUsers       Int      @default(0) // Total users to process
+  castsBackfilled  Int      @default(0) // Total casts backfilled
+  errorCount       Int      @default(0) // Total errors encountered
+  
+  // Failed users tracking (as JSON array of FIDs)
+  failedUserFids   Json?    // Array of user FIDs that failed after all retries
+  
+  // Status
+  status           String   @default("running") // "running", "completed", "failed", "paused"
+  lastBatchNumber  Int      @default(0) // Last batch processed
+  
+  // Timestamps
+  startedAt        DateTime @default(now())
+  completedAt      DateTime?
+  lastProgressAt   DateTime @default(now())
+  
+  @@map("backfill_progress")
 }
